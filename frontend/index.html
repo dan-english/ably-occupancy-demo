@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Channel name injected by Vite from VITE_ABLY_CHANNEL_NAME in .env -->
+    <meta name="ably-channel" content="%VITE_ABLY_CHANNEL_NAME%" />
+    <title>App</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        background: #f9f9f9;
+        color: #1a1a1a;
+      }
+
+      h1 {
+        color: #ff5416;
+      } /* Ably orange */
+
+      #controls {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      button {
+        background: #ff5416;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+
+      button:hover {
+        background: #e04010;
+      }
+
+      #log {
+        background: #1a1a1a;
+        color: #f0f0f0;
+        border-radius: 8px;
+        padding: 1rem;
+        min-height: 200px;
+        max-height: 500px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 0.85rem;
+      }
+
+      #log .entry {
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #2a2a2a;
+        display: flex;
+        gap: 0.75rem;
+      }
+
+      #log .entry:last-child {
+        border-bottom: none;
+      }
+
+      #log .time {
+        color: #888;
+        white-space: nowrap;
+      }
+
+      #log .type-message {
+        color: #7ecfff;
+      }
+      #log .type-occupancy {
+        color: #a8e6a3;
+      }
+      #log .type-system {
+        color: #ffd27e;
+      }
+
+      #log .empty {
+        color: #555;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Ably Channel Monitor</h1>
+
+    <div id="controls">
+      <!-- FIX: was click= should be onclick= -->
+      <button onclick="triggerMockConnections()">Mock Connections</button>
+      <button onclick="clearLog()">Clear</button>
+    </div>
+
+    <div id="log">
+      <div class="entry empty">Waiting for messages...</div>
+    </div>
+
+    <script type="module" src="/debug.js"></script>
+    <script type="module" src="/app.js"></script>
+
+    <script>
+      // Exposed to onclick handlers (app.js uses ES modules so can't be called directly)
+      function triggerMockConnections() {
+        fetch("/api/mock-connections")
+          .then((r) => r.json())
+          .then((d) =>
+            window.__logToScreen(
+              "system",
+              `Triggered ${d.connections} mock connections`,
+            ),
+          )
+          .catch((e) => window.__logToScreen("system", `Error: ${e.message}`));
+      }
+
+      function clearLog() {
+        const log = document.getElementById("log");
+        log.innerHTML =
+          '<div class="entry empty">Waiting for messages...</div>';
+      }
+
+      // Global function called from app.js to append entries to the on-screen log
+      window.__logToScreen = function (type, text) {
+        const log = document.getElementById("log");
+        const empty = log.querySelector(".empty");
+        if (empty) empty.remove();
+
+        const time = new Date().toLocaleTimeString();
+        const entry = document.createElement("div");
+        entry.className = "entry";
+        entry.innerHTML = `
+          <span class="time">${time}</span>
+          <span class="type-${type}">${text}</span>
+        `;
+        log.appendChild(entry);
+        log.scrollTop = log.scrollHeight;
+      };
+    </script>
+  </body>
+</html>

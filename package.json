@@ -1,0 +1,25 @@
+{
+  "name": "occupancy-test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node backend/server.js",
+    "dev": "concurrently \"node backend/server.js\" \"vite frontend\"",
+    "build": "vite build frontend",
+    "preview": "vite preview frontend"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "ably": "^2.21.0",
+    "concurrently": "^9.2.1",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "vite": "^8.0.1"
+  }
+}
