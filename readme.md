@@ -7,3 +7,5 @@ Outputs to screen
 
 - connections/subscribers
 - usess presence to show the client ID's of the connecting client.
+
+![alt text](image.png)
