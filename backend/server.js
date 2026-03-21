@@ -17,7 +17,7 @@ if (!keyName || !keySecret) {
 }
 
 // ── Ably Realtime client (server-side, basic auth is fine here) ───────────────
-const ably = new Ably.Realtime({ key: process.env.ABLY_API_KEY, clientId: 'dans-occu-server' });
+const ably = new Ably.Realtime({ key: process.env.ABLY_API_KEY, clientId: 'demo-server' });
 
 ably.connection.on('connected', () => {
   console.log('Ably connected');
@@ -49,7 +49,7 @@ app.get('/api/ably-token', (req, res) => {
       'x-ably-clientId': clientId,
       // Full rights on the configured channel
       'x-ably-capability': JSON.stringify({
-        [channelName]: ['publish', 'subscribe', 'history', 'channel-metadata'], // <-- add channel-metadata
+        [channelName]: ['publish', 'subscribe', 'history', 'presence', 'channel-metadata'], // <-- add channel-metadata
       }),
     },
     keySecret,
@@ -96,6 +96,8 @@ async function createConnections(count = CONNECTION_COUNT) {
 
     // Subscribe to the main channel
     const channel = client.channels.get(CHANNEL_NAME);
+    await channel.presence.enter(); // <-- add this
+
     await channel.subscribe((msg) => {
       console.log(`[${clientId}] message on '${CHANNEL_NAME}': ${msg.name}`, msg.data);
     });

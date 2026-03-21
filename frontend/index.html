@@ -3,22 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Channel name injected by Vite from VITE_ABLY_CHANNEL_NAME in .env -->
     <meta name="ably-channel" content="%VITE_ABLY_CHANNEL_NAME%" />
     <title>App</title>
     <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
       body {
         font-family: system-ui, sans-serif;
-        max-width: 800px;
-        margin: 2rem auto;
-        padding: 0 1rem;
+        margin: 2rem;
         background: #f9f9f9;
         color: #1a1a1a;
       }
 
       h1 {
         color: #ff5416;
-      } /* Ably orange */
+        margin-top: 0;
+      }
 
       #controls {
         display: flex;
@@ -40,12 +44,47 @@
         background: #e04010;
       }
 
-      #log {
+      /* ── Two-column layout ── */
+      #columns {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 1rem;
+        align-items: start;
+      }
+
+      .panel {
         background: #1a1a1a;
-        color: #f0f0f0;
         border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .panel-header {
+        padding: 0.6rem 1rem;
+        background: #222;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #888;
+        border-bottom: 1px solid #2a2a2a;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .panel-header .count {
+        background: #ff5416;
+        color: white;
+        border-radius: 99px;
+        padding: 0.1rem 0.5rem;
+        font-size: 0.7rem;
+      }
+
+      /* ── Message log (left) ── */
+      #log {
+        color: #f0f0f0;
         padding: 1rem;
-        min-height: 200px;
+        min-height: 300px;
         max-height: 500px;
         overflow-y: auto;
         font-family: monospace;
@@ -62,12 +101,10 @@
       #log .entry:last-child {
         border-bottom: none;
       }
-
       #log .time {
-        color: #888;
+        color: #555;
         white-space: nowrap;
       }
-
       #log .type-message {
         color: #7ecfff;
       }
@@ -77,10 +114,48 @@
       #log .type-system {
         color: #ffd27e;
       }
-
       #log .empty {
         color: #555;
         font-style: italic;
+      }
+
+      /* ── Client list (right) ── */
+      #client-list {
+        padding: 0.5rem 0;
+        min-height: 300px;
+        max-height: 500px;
+        overflow-y: auto;
+      }
+
+      .client-item {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.5rem 1rem;
+        border-bottom: 1px solid #2a2a2a;
+        font-family: monospace;
+        font-size: 0.8rem;
+        color: #f0f0f0;
+      }
+
+      .client-item:last-child {
+        border-bottom: none;
+      }
+
+      .client-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #a8e6a3;
+        flex-shrink: 0;
+      }
+
+      .client-empty {
+        padding: 1rem;
+        color: #555;
+        font-style: italic;
+        font-size: 0.85rem;
+        text-align: center;
       }
     </style>
   </head>
@@ -88,20 +163,35 @@
     <h1>Ably Channel Monitor</h1>
 
     <div id="controls">
-      <!-- FIX: was click= should be onclick= -->
       <button onclick="triggerMockConnections()">Mock Connections</button>
       <button onclick="clearLog()">Clear</button>
     </div>
 
-    <div id="log">
-      <div class="entry empty">Waiting for messages...</div>
+    <div id="columns">
+      <!-- Left: message log -->
+      <div class="panel">
+        <div class="panel-header">Messages</div>
+        <div id="log">
+          <div class="entry empty">Waiting for messages...</div>
+        </div>
+      </div>
+
+      <!-- Right: connected clients -->
+      <div class="panel">
+        <div class="panel-header">
+          Connected Clients
+          <span class="count" id="client-count">0</span>
+        </div>
+        <div id="client-list">
+          <div class="client-empty">No clients yet</div>
+        </div>
+      </div>
     </div>
 
     <script type="module" src="/debug.js"></script>
     <script type="module" src="/app.js"></script>
 
     <script>
-      // Exposed to onclick handlers (app.js uses ES modules so can't be called directly)
       function triggerMockConnections() {
         fetch("/api/mock-connections")
           .then((r) => r.json())
@@ -120,7 +210,7 @@
           '<div class="entry empty">Waiting for messages...</div>';
       }
 
-      // Global function called from app.js to append entries to the on-screen log
+      // Append a message to the log panel
       window.__logToScreen = function (type, text) {
         const log = document.getElementById("log");
         const empty = log.querySelector(".empty");
@@ -129,12 +219,33 @@
         const time = new Date().toLocaleTimeString();
         const entry = document.createElement("div");
         entry.className = "entry";
-        entry.innerHTML = `
-          <span class="time">${time}</span>
-          <span class="type-${type}">${text}</span>
-        `;
+        entry.innerHTML = `<span class="time">${time}</span><span class="type-${type}">${text}</span>`;
         log.appendChild(entry);
         log.scrollTop = log.scrollHeight;
+      };
+
+      // Replace the entire client list with the provided array of clientIds
+      window.__updateClientList = function (clientIds) {
+        const list = document.getElementById("client-list");
+        const count = document.getElementById("client-count");
+
+        count.textContent = clientIds.length;
+
+        if (clientIds.length === 0) {
+          list.innerHTML = '<div class="client-empty">No clients yet</div>';
+          return;
+        }
+
+        list.innerHTML = clientIds
+          .map(
+            (id) => `
+          <div class="client-item">
+            <span class="client-dot"></span>
+            <span>${id}</span>
+          </div>
+        `,
+          )
+          .join("");
       };
     </script>
   </body>
