@@ -33,10 +33,6 @@ const channel = ably.channels.get(process.env.ABLY_CHANNEL_NAME || 'main');
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
 
 // ── JWT token endpoint — issues short-lived Ably JWTs to browser clients ──────
 // The client SDK calls this automatically on connect and before token expiry.
@@ -49,14 +45,14 @@ app.get('/api/ably-token', (req, res) => {
       'x-ably-clientId': clientId,
       // Full rights on the configured channel
       'x-ably-capability': JSON.stringify({
-        [channelName]: ['publish', 'subscribe', 'history', 'presence', 'channel-metadata'], // <-- add channel-metadata
+        [channelName]: ['publish', 'subscribe', 'history', 'presence', 'channel-metadata'],
       }),
     },
     keySecret,
     {
       algorithm: 'HS256',
       keyid: keyName,
-      expiresIn: '1h',
+      expiresIn: '2m',
     }
   );
 
@@ -96,7 +92,7 @@ async function createConnections(count = CONNECTION_COUNT) {
 
     // Subscribe to the main channel
     const channel = client.channels.get(CHANNEL_NAME);
-    await channel.presence.enter(); // <-- add this
+    await channel.presence.enter();
 
     await channel.subscribe((msg) => {
       console.log(`[${clientId}] message on '${CHANNEL_NAME}': ${msg.name}`, msg.data);

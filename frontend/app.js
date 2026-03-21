@@ -28,7 +28,10 @@ const client = new Ably.Realtime({
 client.connection.on('connected', () => {
   debug.success('Ably connected');
   window.__logToScreen?.('system', 'Ably connected');
-  channel.presence.enter({ name: clientId });
+  channel.presence.enter({
+    'extra': 'for experts',
+    'can_add_some_customer_info_here': 'like last seen'
+  });
 
 });
 
@@ -54,19 +57,36 @@ channel.subscribe((message) => {
   window.__logToScreen?.('message', `[${message.name}] ${JSON.stringify(message.data)}`);
 });
 
+/** [PAYLOAD]
+{
+  name: '[meta]occupancy',
+    id: 'V12G5ABc_M:0:0',
+      timestamp: 1612286351217,
+        clientId: undefined,
+          connectionId: undefined,
+            connectionKey: undefined,
+              data: {
+    metrics: {
+      connections: 1,
+        publishers: 1,
+          subscribers: 1,
+            presenceConnections: 1,
+              presenceMembers: 0,
+                presenceSubscribers: 1,
+                  objectPublishers: 1,
+                    objectSubscribers: 1
+    }
+  },
+  encoding: null,
+    extras: undefined,
+      size: undefined
+}
+*/
 // Occupancy events
 channel.subscribe('[meta]occupancy', (msg) => {
   const subscribers = msg.data.metrics.subscribers;
   console.log('Subscribers:', subscribers);
   window.__logToScreen?.('occupancy', `Occupancy update — subscribers: ${subscribers}`);
-});
-
-
-// Occupancy events
-channel.subscribe('[meta]', (msg) => {
-  const meta = msg.data.metrics.subscribers;
-  console.log('meta:', meta);
-  window.__logToScreen?.('meta', ` ${meta}`);
 });
 
 
@@ -77,11 +97,12 @@ channel.on('attached', () => {
 
 debug.log('app.js loaded');
 
-
-
-
 const connectedClients = new Map(); // clientId -> presenceMember
 
+
+/**
+ * Presence functions are: enter, leave, update, present
+ */
 // Get the initial presence set when we attach
 channel.presence.get((err, members) => {
   if (err) return debug.error('Failed to get presence', err);
@@ -92,6 +113,10 @@ channel.presence.get((err, members) => {
 // Keep it up to date as clients enter/leave
 channel.presence.subscribe('enter', (member) => {
   console.log('Client entered:', member.clientId);
+  if (member.data != {}) {
+    console.log(member.data)
+  }
+
   connectedClients.set(member.clientId, member);
   window.__updateClientList?.(Array.from(connectedClients.keys()));
 });
