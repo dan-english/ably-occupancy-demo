@@ -13,6 +13,7 @@
     <div id="controls">
       <button onclick="triggerMockConnections()">Mock Connections</button>
       <button onclick="restAPIrequest()">Rest API Request</button>
+      <button onclick="triggerSilentConnection()">Silent Connect</button>
     </div>
 
     <div id="columns">
@@ -24,10 +25,10 @@
         </div>
       </div>
 
-      <!-- Right: connected clients -->
+      <!-- Right: connected presence clients -->
       <div class="panel">
         <div class="panel-header">
-          Connected Clients
+          Connected (Presence) Clients
           <span class="count" id="client-count">0</span>
         </div>
         <div id="client-list">
@@ -55,6 +56,16 @@
 
       function restAPIrequest() {
         window.open("/api/channel-metadata", "_blank");
+      }
+
+      function triggerSilentConnection() {
+        window.__logToScreen("system", "Triggering silent connection...");
+        fetch("/api/silent-connection")
+          .then((r) => r.json())
+          .then((d) =>
+            window.__logToScreen("system", `Silent connection: ${d.clientId}`),
+          )
+          .catch((e) => window.__logToScreen("system", `Error: ${e.message}`));
       }
 
       // Append a message to the log panel

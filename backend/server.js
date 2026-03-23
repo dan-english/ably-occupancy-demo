@@ -52,7 +52,7 @@ app.get('/api/ably-token', (req, res) => {
     {
       algorithm: 'HS256',
       keyid: keyName,
-      expiresIn: '2m',
+      expiresIn: '2h',
     }
   );
 
@@ -67,7 +67,6 @@ app.listen(PORT, () => {
 
 
 
-
 //. Mock more connections
 const CONNECTION_COUNT = 5;
 
@@ -75,7 +74,7 @@ async function createConnections(count = CONNECTION_COUNT) {
   console.log(`Creating ${count} Ably connections...`);
   const clients = [];
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 1; i <= count; i++) {
     const clientId = `test-user-${i}-${Math.random().toString(36).slice(2, 7)}`;
 
     const client = new Ably.Realtime({
@@ -119,7 +118,20 @@ async function createConnections(count = CONNECTION_COUNT) {
 
 app.get('/api/mock-connections', async (req, res) => {
   const count = parseInt(req.query.count ?? '5', 10);
+
   try {
+
+    const members = await channel.presence.get();
+    const currentCount = members.length;
+    const CAP = 30;
+
+    if (currentCount >= CAP) {
+      return res.status(429).json({
+        ok: false,
+        error: `Presence cap reached: ${currentCount}/${CAP} members already connected`
+      });
+    }
+
     await createConnections(count);
     res.json({ ok: true, connections: count });
   } catch (err) {
@@ -146,4 +158,36 @@ app.get('/api/channel-metadata', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+
+
+
+
+app.get('/api/silent-connection', async (req, res) => {
+  const clientId = `silent-user-${Math.random().toString(36).slice(2, 7)}`;
+
+  const client = new Ably.Realtime({
+    key: process.env.ABLY_API_KEY,
+    clientId,
+  });
+
+  await new Promise((resolve, reject) => {
+    client.connection.once('connected', resolve);
+    client.connection.once('failed', reject);
+  });
+
+  // Subscribe to channel but deliberately skip presence.enter()
+  const silentChannel = client.channels.get(CHANNEL_NAME);
+  await silentChannel.attach();
+
+  console.log(`Silent connection established: ${clientId}`);
+
+  // Clean up after 20s to match mock connection behaviour
+  setTimeout(() => {
+    client.close();
+    console.log(`Silent connection closed: ${clientId}`);
+  }, 20_000);
+
+  res.json({ ok: true, clientId });
 });

@@ -49,11 +49,11 @@ client.connection.on('disconnected', () => {
 
 
 // Regular messages
-channel.subscribe((message) => {
-  if (message.name?.startsWith('[meta]')) return;
-  debug.ably(`Message received on "${channelName}"`, message);
-  window.__logToScreen?.('message', `[${message.name}] ${JSON.stringify(message.data)}`);
-});
+// channel.subscribe((message) => {
+//   if (message.name?.startsWith('[meta]')) return;
+//   debug.ably(`Message received on "${channelName}"`, message);
+//   window.__logToScreen?.('message', `[${message.name}] ${JSON.stringify(message.data)}`);
+// });
 
 /** [PAYLOAD]
 {
@@ -85,6 +85,7 @@ channel.subscribe('[meta]occupancy', (msg) => {
   const subscribers = msg.data.metrics.subscribers;
   debug.occupancy('Subscribers:', subscribers);
   window.__logToScreen?.('occupancy', `Occupancy update — subscribers: ${subscribers}`);
+  console.log(msg)
 });
 
 
