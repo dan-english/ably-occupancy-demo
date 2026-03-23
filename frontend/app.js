@@ -7,6 +7,7 @@ const channelName =
 
 debug.ably(`Connecting to channel: "${channelName}"`);
 const clientId = 'browser-user'
+const connectedClients = new Map(); // clientId -> presenceMember
 
 // ── Ably Realtime client ──────────────────────────────────────────────────────
 const client = new Ably.Realtime({
@@ -25,14 +26,14 @@ const client = new Ably.Realtime({
   }
 });
 
+// ── Subscribe to channel ──────────────────────────────────────────────────────
+const channel = client.channels.get(channelName, {
+  params: { occupancy: 'metrics.subscribers' },
+});
+
 client.connection.on('connected', () => {
   debug.success('Ably connected');
   window.__logToScreen?.('system', 'Ably connected');
-  channel.presence.enter({
-    'extra': 'for experts',
-    'can_add_some_customer_info_here': 'like last seen'
-  });
-
 });
 
 client.connection.on('failed', () => {
@@ -45,10 +46,7 @@ client.connection.on('disconnected', () => {
   window.__logToScreen?.('system', 'Ably disconnected');
 });
 
-// ── Subscribe to channel ──────────────────────────────────────────────────────
-const channel = client.channels.get(channelName, {
-  params: { occupancy: 'metrics.subscribers' },
-});
+
 
 // Regular messages
 channel.subscribe((message) => {
@@ -85,7 +83,7 @@ channel.subscribe((message) => {
 // Occupancy events
 channel.subscribe('[meta]occupancy', (msg) => {
   const subscribers = msg.data.metrics.subscribers;
-  console.log('Subscribers:', subscribers);
+  debug.occupancy('Subscribers:', subscribers);
   window.__logToScreen?.('occupancy', `Occupancy update — subscribers: ${subscribers}`);
 });
 
@@ -93,36 +91,51 @@ channel.subscribe('[meta]occupancy', (msg) => {
 channel.on('attached', () => {
   debug.ably(`Attached to channel: "${channelName}"`);
   window.__logToScreen?.('system', `Attached to channel: "${channelName}"`);
+  //enter the browser client into the room
+  channel.presence.enter({
+    'extra': 'for experts',
+    'can_add_some_customer_info_here': 'like last seen'
+  });
 });
 
 debug.log('app.js loaded');
 
-const connectedClients = new Map(); // clientId -> presenceMember
 
 
 /**
  * Presence functions are: enter, leave, update, present
  */
-// Get the initial presence set when we attach
-channel.presence.get((err, members) => {
-  if (err) return debug.error('Failed to get presence', err);
-  members.forEach(m => connectedClients.set(m.clientId, m));
-  window.__updateClientList?.(Array.from(connectedClients.keys()));
-});
 
-// Keep it up to date as clients enter/leave
-channel.presence.subscribe('enter', (member) => {
-  console.log('Client entered:', member.clientId);
-  if (member.data != {}) {
-    console.log(member.data)
-  }
-
+// Subscribe BEFORE the channel attaches - catches 'present' actions during sync
+channel.presence.subscribe('present', (member) => {
+  debug.presenceEnterSync('Present during sync:', member.clientId);
   connectedClients.set(member.clientId, member);
   window.__updateClientList?.(Array.from(connectedClients.keys()));
 });
 
+
+// Keep it up to date as clients enter/leave
+channel.presence.subscribe('enter', (member) => {
+
+  if (member.data !== undefined) {
+    debug.presenceEnterWithData('Client entered with meta-data:', member.clientId);
+    console.log(member.data)
+    console.groupEnd();
+  }
+  else {
+    debug.presenceEnter('Client entered:', member.clientId);
+  }
+  connectedClients.set(member.clientId, member);
+  window.__updateClientList?.(Array.from(connectedClients.keys()));
+
+  // window.__logToScreen('presence-enter', `Client entered: ${member.clientId}`);
+});
+
+// listen for the leave event
 channel.presence.subscribe('leave', (member) => {
-  console.log('Client left:', member.clientId);
+  debug.presenceLeave('Client left:', member.clientId);
   connectedClients.delete(member.clientId);
   window.__updateClientList?.(Array.from(connectedClients.keys()));
+
+  // window.__logToScreen('presence-left', `Client left: ${member.clientId}`);
 });

@@ -76,7 +76,8 @@ async function createConnections(count = CONNECTION_COUNT) {
   const clients = [];
 
   for (let i = 0; i < count; i++) {
-    const clientId = `test-user-${Date.now()}-${i}`;
+    const clientId = `test-user-${i}-${Math.random().toString(36).slice(2, 7)}`;
+
     const client = new Ably.Realtime({
       key: process.env.ABLY_API_KEY,
       clientId,
@@ -111,7 +112,7 @@ async function createConnections(count = CONNECTION_COUNT) {
       c.client.close();
       console.log(`✗ Connection ${i + 1} closed`);
     });
-  }, 30_000);
+  }, 20_000);
 
   return clients;
 }
@@ -129,7 +130,7 @@ app.get('/api/mock-connections', async (req, res) => {
 
 
 
-// ── Get channel metadata via REST ─────────────────────────────────────────────
+// ── Get channel metadata via REST to determine oocupancy ─────────────────────────────────────────────
 app.get('/api/channel-metadata', async (req, res) => {
   try {
     const response = await fetch(

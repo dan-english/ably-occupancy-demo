@@ -12,13 +12,13 @@
 
     <div id="controls">
       <button onclick="triggerMockConnections()">Mock Connections</button>
-      <button onclick="clearLog()">Clear</button>
+      <button onclick="restAPIrequest()">Rest API Request</button>
     </div>
 
     <div id="columns">
       <!-- Left: message log -->
       <div class="panel">
-        <div class="panel-header">Messages</div>
+        <div class="panel-header">Debug</div>
         <div id="log">
           <div class="entry empty">Waiting for messages...</div>
         </div>
@@ -41,14 +41,9 @@
 
     <script>
       function triggerMockConnections() {
+        window.__logToScreen("system", "Triggered  mock connections");
         fetch("/api/mock-connections")
           .then((r) => r.json())
-          .then((d) =>
-            window.__logToScreen(
-              "system",
-              `Triggered ${d.connections} mock connections`,
-            ),
-          )
           .catch((e) => window.__logToScreen("system", `Error: ${e.message}`));
       }
 
@@ -56,6 +51,10 @@
         const log = document.getElementById("log");
         log.innerHTML =
           '<div class="entry empty">Waiting for messages...</div>';
+      }
+
+      function restAPIrequest() {
+        window.open("/api/channel-metadata", "_blank");
       }
 
       // Append a message to the log panel
