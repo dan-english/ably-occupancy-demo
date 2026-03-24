@@ -121,6 +121,7 @@ app.get('/api/mock-connections', async (req, res) => {
 
   try {
 
+    // Simple check of presence levels to reject mock requests
     const rest = new Ably.Rest({ key: process.env.ABLY_API_KEY });
     const restChannel = rest.channels.get(CHANNEL_NAME);
     const members = await restChannel.presence.get();
