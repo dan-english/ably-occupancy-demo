@@ -52,7 +52,7 @@ app.get('/api/ably-token', (req, res) => {
     {
       algorithm: 'HS256',
       keyid: keyName,
-      expiresIn: '2h',
+      expiresIn: '3m',
     }
   );
 
@@ -84,7 +84,7 @@ async function createConnections(count = CONNECTION_COUNT) {
 
     await new Promise((resolve, reject) => {
       client.connection.once('connected', () => {
-        console.log(`✓ Connection ${i + 1} established (clientId: ${clientId})`);
+        console.log(`✓ Connection established (clientId: ${clientId})`);
         resolve();
       });
       client.connection.once('failed', reject);
@@ -109,7 +109,7 @@ async function createConnections(count = CONNECTION_COUNT) {
   setTimeout(() => {
     clients.forEach((c, i) => {
       c.client.close();
-      console.log(`✗ Connection ${i + 1} closed`);
+      console.log(`✗ Connection ${c.client.clientId} closed`);
     });
   }, 20_000);
 
@@ -121,8 +121,10 @@ app.get('/api/mock-connections', async (req, res) => {
 
   try {
 
-    const members = await channel.presence.get();
-    const currentCount = members.length;
+    const rest = new Ably.Rest({ key: process.env.ABLY_API_KEY });
+    const restChannel = rest.channels.get(CHANNEL_NAME);
+    const members = await restChannel.presence.get();
+    const currentCount = members.items.length;
     const CAP = 30;
 
     if (currentCount >= CAP) {
