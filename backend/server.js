@@ -5,11 +5,10 @@ const Ably = require('ably');
 const jwt = require('jsonwebtoken');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 
 const CHANNEL_NAME = process.env.ABLY_CHANNEL_NAME
 
-// ── Parse API key into name + secret (format: "<keyName>:<keySecret>") ────────
 const [keyName, keySecret] = (process.env.ABLY_API_KEY || '').split(':');
 if (!keyName || !keySecret) {
   console.error('ABLY_API_KEY must be in the format "<keyName>:<keySecret>"');
@@ -34,8 +33,8 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 
-// ── JWT token endpoint — issues short-lived Ably JWTs to browser clients ──────
-// The client SDK calls this automatically on connect and before token expiry.
+
+// generate JWT for front end users.
 app.get('/api/ably-token', (req, res) => {
   const channelName = process.env.ABLY_CHANNEL_NAME || 'main';
   const clientId = req.query.clientId || `client-${Date.now()}`;
@@ -43,9 +42,8 @@ app.get('/api/ably-token', (req, res) => {
   const ablyJwt = jwt.sign(
     {
       'x-ably-clientId': clientId,
-      // Full rights on the configured channel
       'x-ably-capability': JSON.stringify({
-        [channelName]: ['publish', 'subscribe', 'history', 'presence', 'channel-metadata'],
+        [channelName]: ['subscribe', 'presence', 'channel-metadata'],
       }),
     },
     keySecret,
@@ -56,8 +54,7 @@ app.get('/api/ably-token', (req, res) => {
     }
   );
 
-  // Return the JWT as plain text — the Ably SDK expects a string, not JSON
-  res.setHeader('Content-Type', 'text/plain');
+  res.set("Content-Type", "application/jwt");
   res.send(ablyJwt);
 });
 
@@ -121,17 +118,18 @@ app.get('/api/mock-connections', async (req, res) => {
 
   try {
 
-    // Simple check of presence levels to reject mock requests
     const rest = new Ably.Rest({ key: process.env.ABLY_API_KEY });
     const restChannel = rest.channels.get(CHANNEL_NAME);
+    //
     const members = await restChannel.presence.get();
+    console.log(members)
     const currentCount = members.items.length;
-    const CAP = 30;
 
-    if (currentCount >= CAP) {
+    // Simple check of presence levels to reject mock requests so i can restrict the number of mock connections.
+    if (currentCount >= 30) {
       return res.status(429).json({
         ok: false,
-        error: `Presence cap reached: ${currentCount}/${CAP} members already connected`
+        error: `Max mock connections created: ${currentCount}/${CAP} mock members already connected`
       });
     }
 
@@ -145,7 +143,7 @@ app.get('/api/mock-connections', async (req, res) => {
 
 
 
-// ── Get channel metadata via REST to determine oocupancy ─────────────────────────────────────────────
+// ── Get channel metadata via REST to determine oocupancy
 app.get('/api/channel-metadata', async (req, res) => {
   try {
     const response = await fetch(
@@ -166,10 +164,13 @@ app.get('/api/channel-metadata', async (req, res) => {
 
 
 
-
+/**
+ * Attach to the channel but don't use presence.
+ */
 app.get('/api/silent-connection', async (req, res) => {
   const clientId = `silent-user-${Math.random().toString(36).slice(2, 7)}`;
 
+  // create a new client like a new user
   const client = new Ably.Realtime({
     key: process.env.ABLY_API_KEY,
     clientId,
@@ -194,3 +195,12 @@ app.get('/api/silent-connection', async (req, res) => {
 
   res.json({ ok: true, clientId });
 });
+
+
+
+// presenceConnections = any client that has connected with Presence permissions.
+// presenceSubscribers = any client that can subscribed to presence events (has perms)
+// presenceMembers = any client that has fired presence.enter()
+// connections = connections
+// publishers = counts any client thas has called publish() on the channel
+// subscribers = any

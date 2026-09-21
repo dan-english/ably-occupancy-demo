@@ -9,6 +9,7 @@
   </head>
   <body>
     <h1>Ably Occupancy Channel Monitor</h1>
+    <div id="client-id">Client ID: <span id="client-id-value">–</span></div>
 
     <div id="controls">
       <button onclick="triggerMockConnections()">Mock Connections</button>
@@ -27,10 +28,7 @@
 
       <!-- Right: connected presence clients -->
       <div class="panel">
-        <div class="panel-header">
-          Connected (Presence) Clients
-          <span class="count" id="client-count">0</span>
-        </div>
+        <div class="panel-header">Connected (Presence) Clients</div>
         <div id="client-list">
           <div class="client-empty">No clients yet</div>
         </div>
@@ -42,7 +40,7 @@
 
     <script>
       function triggerMockConnections() {
-        window.__logToScreen("system", "Triggered  mock connections");
+        window.__logToScreen("system", "Triggered  mock connections (5)");
         fetch("/api/mock-connections")
           .then((r) => r.json())
           .catch((e) => window.__logToScreen("system", `Error: ${e.message}`));
@@ -82,26 +80,28 @@
         log.scrollTop = log.scrollHeight;
       };
 
-      // Replace the entire client list with the provided array of clientIds
+      // Update the client list
       window.__updateClientList = function (clientIds) {
         const list = document.getElementById("client-list");
-        const count = document.getElementById("client-count");
-
-        count.textContent = clientIds.length;
 
         if (clientIds.length === 0) {
           list.innerHTML = '<div class="client-empty">No clients yet</div>';
           return;
         }
 
-        list.innerHTML = clientIds
+        // console.log(clientIds);
+        // for (const member of clientIds) {
+        //   console.log(member);
+        // }
+
+        list.innerHTML = Array.from(clientIds.entries())
           .map(
-            (id) => `
-          <div class="client-item">
-            <span class="client-dot"></span>
-            <span>${id}</span>
-          </div>
-        `,
+            ([id, count]) => `
+    <div class="client-item">
+      <span class="client-dot"></span>
+<span>${id}${count > 1 ? ` (${count})` : ""}</span>
+    </div>
+  `,
           )
           .join("");
       };

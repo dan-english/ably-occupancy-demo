@@ -13,11 +13,11 @@ export default defineConfig({
   envDir: path.resolve(__dirname, '..'),
 
   server: {
-    port: 5173,
+    port: 5273,
     proxy: {
       // Forward /api requests to the Express backend during development
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:4000',
         changeOrigin: true,
       },
     },

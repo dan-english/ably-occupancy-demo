@@ -1,15 +1,18 @@
 import * as debug from './debug.js';
 import * as Ably from 'ably';
 
-// ── Read channel name injected by Vite from .env (VITE_ABLY_CHANNEL_NAME) ────
-const channelName =
-  document.querySelector('meta[name="ably-channel"]')?.content || 'main';
+debug.log('app.js loaded');
 
+const channelName = import.meta.env.VITE_ABLY_CHANNEL_NAME
 debug.ably(`Connecting to channel: "${channelName}"`);
-const clientId = 'browser-user'
-const connectedClients = new Map(); // clientId -> presenceMember
 
-// ── Ably Realtime client ──────────────────────────────────────────────────────
+const clientId = `browser-user-${Math.floor(Math.random() * 1000000)}`;
+document.getElementById('client-id-value').textContent = clientId;
+//running list of active connected clients (updated on presence enter/leave)
+const connectedClients = new Map();
+
+
+
 const client = new Ably.Realtime({
   authCallback: async (tokenParams, callback) => {
     try {
@@ -23,17 +26,19 @@ const client = new Ably.Realtime({
       debug.error('Failed to fetch Ably token', err);
       callback(err, null);
     }
-  }
-});
+  },
+  params: { occupancy: 'metrics' }
+}
+);
 
-// ── Subscribe to channel ──────────────────────────────────────────────────────
+
 const channel = client.channels.get(channelName, {
   params: { occupancy: 'metrics.subscribers' },
 });
 
 client.connection.on('connected', () => {
   debug.success('Ably connected');
-  window.__logToScreen?.('system', 'Ably connected');
+  window.__logToScreen?.('system', 'Ably Client Connected');
 });
 
 client.connection.on('failed', () => {
@@ -48,44 +53,11 @@ client.connection.on('disconnected', () => {
 
 
 
-// Regular messages
-// channel.subscribe((message) => {
-//   if (message.name?.startsWith('[meta]')) return;
-//   debug.ably(`Message received on "${channelName}"`, message);
-//   window.__logToScreen?.('message', `[${message.name}] ${JSON.stringify(message.data)}`);
-// });
-
-/** [PAYLOAD]
-{
-  name: '[meta]occupancy',
-    id: 'V12G5ABc_M:0:0',
-      timestamp: 1612286351217,
-        clientId: undefined,
-          connectionId: undefined,
-            connectionKey: undefined,
-              data: {
-    metrics: {
-      connections: 1,
-        publishers: 1,
-          subscribers: 1,
-            presenceConnections: 1,
-              presenceMembers: 0,
-                presenceSubscribers: 1,
-                  objectPublishers: 1,
-                    objectSubscribers: 1
-    }
-  },
-  encoding: null,
-    extras: undefined,
-      size: undefined
-}
-*/
-// Occupancy events
+// Subscribe to changes on Occupancy events
 channel.subscribe('[meta]occupancy', (msg) => {
   const subscribers = msg.data.metrics.subscribers;
   debug.occupancy('Subscribers:', subscribers);
-  window.__logToScreen?.('occupancy', `Occupancy update — subscribers: ${subscribers}`);
-  console.log(msg)
+  window.__logToScreen?.('occupancy', `Occupancy update — subscriber: ${subscribers}`);
 });
 
 
@@ -99,7 +71,6 @@ channel.on('attached', () => {
   });
 });
 
-debug.log('app.js loaded');
 
 
 
@@ -109,34 +80,102 @@ debug.log('app.js loaded');
 
 // Subscribe BEFORE the channel attaches - catches 'present' actions during sync
 channel.presence.subscribe('present', (member) => {
-  debug.presenceEnterSync('Present during sync:', member.clientId);
-  connectedClients.set(member.clientId, member);
+  debug.presenceEnterSync('--- Client already in channel and present during sync:', member.clientId);
+
+  // store the existing users present in an array
   window.__updateClientList?.(Array.from(connectedClients.keys()));
 });
 
 
-// Keep it up to date as clients enter/leave
-channel.presence.subscribe('enter', (member) => {
+// listen for new enters on the channel
+channel.presence.subscribe('enter', async (member) => {
+
+  const members = await channel.presence.get();
+  connectedClients.clear();
+
+  const id = member.clientId;
+
+  members.forEach(member => {
+    const id = member.clientId;
+    connectedClients.set(id, (connectedClients.get(id) || 0) + 1);
+  });
+
+  window.__updateClientList?.(connectedClients);
 
   if (member.data !== undefined) {
     debug.presenceEnterWithData('Client entered with meta-data:', member.clientId);
-    console.log(member.data)
-    console.groupEnd();
+    console.log(member);
+
   }
   else {
     debug.presenceEnter('Client entered:', member.clientId);
   }
-  connectedClients.set(member.clientId, member);
-  window.__updateClientList?.(Array.from(connectedClients.keys()));
 
-  // window.__logToScreen('presence-enter', `Client entered: ${member.clientId}`);
+  window.__logToScreen('presence-enter', `Client entered: ${member.clientId}`);
+
+
+
 });
+
 
 // listen for the leave event
-channel.presence.subscribe('leave', (member) => {
-  debug.presenceLeave('Client left:', member.clientId);
-  connectedClients.delete(member.clientId);
-  window.__updateClientList?.(Array.from(connectedClients.keys()));
+channel.presence.subscribe('leave', async (member) => {
 
-  // window.__logToScreen('presence-left', `Client left: ${member.clientId}`);
+  debug.presenceLeave('Client left:', member.clientId);
+  connectedClients.clear();
+
+  //get latest presence data
+  const members = await channel.presence.get();
+  // update the UI list with existing members
+  members.forEach(member => {
+    const id = member.clientId;
+    connectedClients.set(id, (connectedClients.get(id) || 0) + 1);
+  });
+
+  window.__updateClientList?.(connectedClients);
+
+  const count = connectedClients.get(member.clientId);
+  if (count > 0) {
+    window.__logToScreen('presence-left', `Client left: ${member.clientId} still active in ${count} tabs`);
+  }
+  else {
+    window.__logToScreen('presence-left', `Client left: ${member.clientId}`);
+  }
+
 });
+
+
+/**
+ * A silent connection will increment the number of
+ * connections
+ * subscribers
+ * presence connections
+ * presence subscribers
+ * BUT NOT presence members.
+ */
+
+/** occupancy pay load
+{
+  name: '[meta]occupancy',
+    id: 'V12G5ABc_M:0:0',
+    timestamp: 1612286351217,
+    clientId: undefined,
+    connectionId: undefined,
+    connectionKey: undefined,
+    data: {
+      metrics: {
+        connections: 1,
+        publishers: 1,
+        subscribers: 1,
+        presenceConnections: 1,
+        presenceMembers: 0,
+        presenceSubscribers: 1,
+        objectPublishers: 1,
+        objectSubscribers: 1
+    }
+  },
+  encoding: null,
+    extras: undefined,
+      size: undefined
+}
+*/
