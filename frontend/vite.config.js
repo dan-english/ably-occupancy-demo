@@ -14,6 +14,10 @@ export default defineConfig({
 
   server: {
     port: 5273,
+    host: '0.0.0.0',
+    allowedHosts: [
+      'ably-occupancy-demo.dev-site.io',
+    ],
     proxy: {
       // Forward /api requests to the Express backend during development
       '/api': {
