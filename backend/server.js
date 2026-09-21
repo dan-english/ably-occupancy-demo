@@ -58,6 +58,32 @@ app.get('/api/ably-token', (req, res) => {
   res.send(ablyJwt);
 });
 
+// ── Webhook receiver ──────────────────────────────────────────────────────────
+// Accepts POSTed events from an external service and republishes them on the
+// Ably channel as a 'webhook-event' message. Any client subscribed to the
+// channel (e.g. the browser) picks it up in real time and can render a toast.
+app.post('/api/webhooks', async (req, res) => {
+  // Optional shared-secret check — set WEBHOOK_SECRET in .env to enable.
+  const expectedSecret = process.env.WEBHOOK_SECRET;
+  if (expectedSecret) {
+    const provided = req.get('x-webhook-secret');
+    if (provided !== expectedSecret) {
+      return res.status(401).json({ ok: false, error: 'Invalid webhook secret' });
+    }
+  }
+
+  const payload = req.body;
+  console.log('Webhook received:', payload);
+
+  try {
+    await channel.publish('webhook-event', payload);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Failed to publish webhook event:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

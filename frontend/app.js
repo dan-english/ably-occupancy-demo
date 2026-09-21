@@ -1,5 +1,6 @@
 import * as debug from './debug.js';
 import * as Ably from 'ably';
+import { showToast } from './toast.js';
 
 debug.log('app.js loaded');
 
@@ -58,6 +59,14 @@ channel.subscribe('[meta]occupancy', (msg) => {
   const subscribers = msg.data.metrics.subscribers;
   debug.occupancy('Subscribers:', subscribers);
   window.__logToScreen?.('occupancy', `Occupancy update — subscriber: ${subscribers}`);
+});
+
+// Server-side webhooks land here — see POST /api/webhooks on the backend,
+// which republishes the incoming payload on this channel as 'webhook-event'.
+channel.subscribe('webhook-event', (msg) => {
+  debug.log('Webhook event received:', msg.data);
+  window.__logToScreen?.('system', `Webhook event: ${JSON.stringify(msg.data)}`);
+  showToast(`Webhook: ${JSON.stringify(msg.data)}`, 'info');
 });
 
 
